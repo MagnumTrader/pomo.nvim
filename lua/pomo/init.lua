@@ -2,6 +2,13 @@ local M = {}
 require("pomo.dev")
 local uv = vim.uv
 
+
+-- i want to calculate when i start going into insert mode.
+-- and then record the inputs
+-- and the stop time?
+--
+-- i will parse it in rust
+
 M._connected = false
 
 -- what is it that will be open first?
@@ -12,22 +19,33 @@ M._connected = false
 --
 --
 -- Pomo timer can take a optional port number to enable connections through localhost:PORT
+-- TODO: we can actually have a connect and start the application here
+--
+--
+--
+
 M.connect = function()
     M.socket = uv.new_tcp()
 
-    if M._connected then
-        print ("Already connected")
-        return
-    end
-
-    M.socket:connect("127.0.0.1", 42069, function(err)
+    --TODO: this doesnt account for if the server shutdown
+    local port = 42069
+    M.socket:connect("127.0.0.1", port, function(err)
         if err then
-            print("error occured when connecting, is Pomo.rs running?\n" .. err)
+            print("Error occured when trying to connect, is Pomo.rs running and have port " .. port .. " available? " .. err)
         else
-            print("connected successfully to Pomo frontend") M._connected = true
+            print("connected successfully to Pomo frontend")
+            M._connected = true
         end
     end)
 end
+
+--M.socket:read_start(function (err, data)
+--    if err ~= nil then
+--        print("some error occured: " .. err)
+--    end
+--
+--    print(data)
+--end)
 
 M.send = function(message)
 
@@ -47,6 +65,7 @@ M.send = function(message)
         end)
         return
     end
+
     uv.write(M.socket, message, function(err)
         if err then
             print("error occured when writing\n" .. err)
@@ -54,35 +73,10 @@ M.send = function(message)
     end)
 end
 
-M._CONNECTIONS = 0
-
-M.listen =  function ()
-    -- listen for a connection,
-    -- start sending keystrokes or words or whatever on that connection
-    M.server = uv.new_tcp()
-    M.server:bind("127.0.0.1", 42069)
-    M.server:listen(128, function (err)
-        assert(not err, err)
-        local client = uv.new_tcp()
-        M.server:accept(client)
-        client:read_start(function (err, chunk)
-            if err ~= nil then
-                print("error maybe dropped? do cleanup go back to listen?")
-            end
-            if chunk then
-                print("recieved:" .. chunk)
-                client:write("hello from Neovim")
-            else
-                print("shutting down connection")
-                client:shutdown()
-                client:close()
-            end
-        end)
+vim.keymap.set("n", "<leader><leader>o", function ()
+    vim.ui.input({prompt = "write the message"}, function (input)
+        require("pomo").send(input)
     end)
-    print("waiting for connections:")
-end
-
--- TODO: popup window for message to insert
-vim.keymap.set("n", "<leader><leader>o", M.send, {})
+end)
 
 return M
